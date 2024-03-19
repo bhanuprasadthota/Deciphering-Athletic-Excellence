@@ -1,0 +1,118 @@
+---
+title: "Assignment06"
+output: html_document
+date: "2024-03-17"
+---
+install.packages("HSAUR")
+
+```{r}
+# Loading the library
+library(HSAUR)
+
+# Loading the Heptathlon dataset
+data("heptathlon", package = "HSAUR")
+
+str(heptathlon)
+
+# Replace the score column with the categorical variable
+heptathlon$score <- cut(heptathlon$score,
+                        breaks = quantile(heptathlon$score, probs = c(0, 1/3, 2/3, 1)),
+                        include.lowest = TRUE,
+                        labels = c("Low", "Medium", "High"))
+
+# Now the score column is categorical
+str(heptathlon$score)
+# You can also view the distribution of the new categorical scores
+table(heptathlon$score)
+summary(heptathlon)
+
+```
+```{r}
+# Splitting the data
+set.seed(444)
+ind = sample(2, nrow(heptathlon), 
+              replace = TRUE, 
+              prob = c(.8, .2))
+training = heptathlon[ind==1,]
+testing = heptathlon[ind==2,]
+```
+
+```{r}
+# Scatter Plot and Correlations
+library(psych)
+pairs.panels(training[,-8],
+             gap = 0,
+             bg = c("red", "yellow", "blue")[training$score],
+             pch = 21)
+```
+```{r}
+# Principle componet analysis
+pc = prcomp(training[,-8],
+            center = TRUE,
+            scale. = TRUE)
+attributes(pc)
+print(pc)
+summary(pc)
+```
+```{r}
+training$score
+# Orthagonality of principal component
+pairs.panels(pc$x,
+             gap = 0,
+             bg = c("red", "yellow", "blue")[training$score],
+             pch = 21)
+
+```
+```{r}
+#Bi-Plot
+library(devtools)
+library(ggbiplot)
+g = ggbiplot(pc,
+             obs.scale = 1,
+             var.scale = 1,
+             groups = training$score,
+             ellipse = TRUE,
+             circle = TRUE,
+             ellipse.prob = 0.67)
+g = g + scale_color_discrete(name = '')
+g = g + theme(legend.direction = 'horizontal',
+              legend.position= 'top')
+print(g)
+```
+
+```{r}
+# Prediction with principal components
+trg = predict(pc,training)
+trg = data.frame(trg, training[8])
+trg
+tst = predict(pc, testing)
+tst = data.frame(tst, testing[8])
+tst
+```
+
+```{r}
+# Multi-nomial Logistic regression with first 2 PC's
+library(nnet)
+trg$score = relevel(trg$score, ref = "Low")
+mymodel = multinom(score~PC1+PC2, data = trg)
+summary(mymodel)
+```
+```{r}
+#Confusion matrix & Misclassification Error - training
+p = predict(mymodel, trg)
+tab = table(p, trg$score)
+tab
+1 - sum(diag(tab))/sum(tab)
+```
+```{r}
+# Confusion Matrix & Misclassification Error - testing
+p1 = predict(mymodel, tst)
+tab1 = table(p1, tst$score)
+tab1
+1 - sum(diag(tab1))/sum(tab1)
+```
+
+
+
+
+
